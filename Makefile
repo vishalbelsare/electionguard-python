@@ -146,6 +146,7 @@ bench:
 # Documentation
 install-mkdocs:
 	pip install mkdocs
+	pip install mkdocs-mermaid2-plugin
 
 docs-serve:
 	mkdocs serve
