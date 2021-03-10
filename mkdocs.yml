@@ -13,6 +13,7 @@ nav:
     - Build and Run: Build_and_Run.md
     - Project Workflow: Project_Workflow.md
     - Election Manifest: Election_Manifest.md
+    - Modules: Modules.md
     - Steps:
         - 0. Configure Election: 0_Configure_Election.md
         - 1. Key Ceremony: 1_Key_Ceremony.md
