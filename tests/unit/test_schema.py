@@ -1,4 +1,4 @@
-from unittest import TestCase
+from tests.base_test_case import BaseTestCase
 
 from electionguard.schema import get_election_description_schema, validate_json_schema
 import electionguardtest.election_factory as ElectionFactory
@@ -6,7 +6,7 @@ import electionguardtest.election_factory as ElectionFactory
 election_factory = ElectionFactory.ElectionFactory()
 
 
-class TestSchema(TestCase):
+class TestSchema(BaseTestCase):
     """Test cases for schema"""
 
     def test_election_description_schema(self):

@@ -1,7 +1,7 @@
-import unittest
-
 from hypothesis import given
 from hypothesis.strategies import integers
+
+from tests.base_test_case import BaseTestCase
 
 from electionguard.constants import (
     get_large_prime,
@@ -31,7 +31,7 @@ def _discrete_log_uncached(e: ElementModP) -> int:
     return count
 
 
-class TestDLog(unittest.TestCase):
+class TestDLog(BaseTestCase):
     """Discrete log tests"""
 
     @given(integers(0, 100))
