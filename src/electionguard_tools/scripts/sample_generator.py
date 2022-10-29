@@ -18,6 +18,7 @@ from electionguard.encrypt import (
 )
 from electionguard.guardian import PrivateGuardianRecord
 from electionguard.tally import tally_ballots
+from electionguard.type import BallotId
 from electionguard.utils import get_optional
 
 from electionguard_tools.factories.ballot_factory import BallotFactory
@@ -37,7 +38,7 @@ DEFAULT_NUMBER_OF_BALLOTS = 5
 DEFAULT_SPOIL_RATE = 50
 DEFAULT_USE_ALL_GUARDIANS = False
 DEFAULT_USE_PRIVATE_DATA = False
-DEFAULT_SPEC_VERSION = "0.95.0"
+DEFAULT_SPEC_VERSION = "1.0"
 DEFAULT_SAMPLE_MANIFEST = "hamilton-general"
 
 
@@ -64,9 +65,8 @@ class ElectionSampleDataGenerator:
         spoil_rate: int = DEFAULT_SPOIL_RATE,
         use_all_guardians: bool = DEFAULT_USE_ALL_GUARDIANS,
         use_private_data: bool = DEFAULT_USE_PRIVATE_DATA,
-        spec_version: str = DEFAULT_SPEC_VERSION,
         sample_manifest: str = DEFAULT_SAMPLE_MANIFEST,
-    ):
+    ) -> None:
         """
         Generate the sample data set
         """
@@ -81,7 +81,7 @@ class ElectionSampleDataGenerator:
             public_data,
             private_data,
         ) = self.election_factory.get_sample_manifest_with_encryption_context(
-            spec_version, sample_manifest
+            sample_manifest
         )
         plaintext_ballots = (
             self.ballot_factory.generate_fake_plaintext_ballots_for_election(
@@ -99,7 +99,7 @@ class ElectionSampleDataGenerator:
                 get_optional(self.encrypter.encrypt(plaintext_ballot))
             )
 
-        ballot_store = DataStore()
+        ballot_store: DataStore[BallotId, SubmittedBallot] = DataStore()
         ballot_box = BallotBox(
             public_data.internal_manifest, public_data.context, ballot_store
         )
@@ -108,9 +108,9 @@ class ElectionSampleDataGenerator:
         submitted_ballots: List[SubmittedBallot] = []
         for ballot in ciphertext_ballots:
             if randint(0, 100) < spoil_rate:
-                submitted_ballots.append(ballot_box.spoil(ballot))
+                submitted_ballots.append(get_optional(ballot_box.spoil(ballot)))
             else:
-                submitted_ballots.append(ballot_box.cast(ballot))
+                submitted_ballots.append(get_optional(ballot_box.cast(ballot)))
 
         # Tally
         spoiled_ciphertext_ballots = get_ballots(ballot_store, BallotBoxState.SPOILED)
@@ -128,6 +128,8 @@ class ElectionSampleDataGenerator:
             else private_data.guardians[0:QUORUM]
         )
 
+        spoiled_ballots = list(spoiled_ciphertext_ballots.values())
+
         if not use_all_guardians:
             available_guardians = private_data.guardians[0:QUORUM]
             all_guardian_keys = [
@@ -140,7 +142,7 @@ class ElectionSampleDataGenerator:
                 mediator,
                 public_data.context,
                 ciphertext_tally,
-                spoiled_ciphertext_ballots.values(),
+                spoiled_ballots,
             )
         else:
             TallyCeremonyOrchestrator.perform_decryption_setup(
@@ -148,12 +150,16 @@ class ElectionSampleDataGenerator:
                 mediator,
                 public_data.context,
                 ciphertext_tally,
-                spoiled_ciphertext_ballots.values(),
+                spoiled_ballots,
             )
 
-        plaintext_tally = mediator.get_plaintext_tally(ciphertext_tally, public_data)
-        plaintext_spoiled_ballots = mediator.get_plaintext_ballots(
-            spoiled_ciphertext_ballots.values(), public_data
+        plaintext_tally = mediator.get_plaintext_tally(
+            ciphertext_tally, public_data.manifest
+        )
+        plaintext_spoiled_ballots = list(
+            get_optional(
+                mediator.get_plaintext_ballots(spoiled_ballots, public_data.manifest)
+            ).values()
         )
 
         if plaintext_tally:
@@ -163,7 +169,7 @@ class ElectionSampleDataGenerator:
                 public_data.constants,
                 [self.encryption_device],
                 submitted_ballots,
-                plaintext_spoiled_ballots.values(),
+                plaintext_spoiled_ballots,
                 ciphertext_tally.publish(),
                 plaintext_tally,
                 public_data.guardians,
@@ -251,6 +257,5 @@ if __name__ == "__main__":
         args.spoil_rate,
         args.all_guardians,
         args.private_data,
-        args.version,
         args.manifest,
     )

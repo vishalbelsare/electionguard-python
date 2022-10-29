@@ -49,7 +49,7 @@ class CiphertextElectionContext:
     """
     quorum: int
     """
-    The quorum of guardians necessary to decrypt an election.  Must be less than `number_of_guardians`
+    The quorum of guardians necessary to decrypt an election.  Must be fewer than `number_of_guardians`
     """
 
     elgamal_public_key: ElGamalPublicKey
@@ -76,6 +76,13 @@ class CiphertextElectionContext:
     configuration: Configuration = field(default_factory=Configuration)
     """Configuration for the election edge cases."""
 
+    def get_extended_data_field(self, field_name: str) -> Optional[str]:
+        """Returns the value for a field in the extended data or None if it isn't initialized."""
+
+        if self.extended_data is None:
+            return None
+        return self.extended_data.get(field_name)
+
 
 def make_ciphertext_election_context(
     number_of_guardians: int,
@@ -89,7 +96,7 @@ def make_ciphertext_election_context(
     Makes a CiphertextElectionContext object.
 
     :param number_of_guardians: The number of guardians necessary to generate the public key
-    :param quorum: The quorum of guardians necessary to decrypt an election.  Must be less than `number_of_guardians`
+    :param quorum: The quorum of guardians necessary to decrypt an election.  Must be fewer than `number_of_guardians`
     :param elgamal_public_key: the public key of the election
     :param commitment_hash: the hash of the commitments the guardians make to each other
     :param manifest_hash: the hash of the election metadata

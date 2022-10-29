@@ -82,12 +82,13 @@ auto-lint:
 	poetry run mkinit src/electionguard_tools --write --recursive --black
 	poetry run mkinit src/electionguard_verify --write --black
 	poetry run mkinit src/electionguard_cli --write --recursive --black
+	poetry run mkinit src/electionguard_gui --write --recursive --black
 	@echo Reformatting using Black
 	make blackformat
 	make lint
 	
 pylint:
-	poetry run pylint ./src ./tests
+	poetry run pylint --extension-pkg-allow-list=dependency_injector ./src ./tests
 
 blackformat:
 	poetry run black .
@@ -96,7 +97,7 @@ blackcheck:
 	poetry run black --check .
 
 mypy:
-	poetry run mypy src/electionguard src/electionguard_cli stubs
+	poetry run mypy src/electionguard src/electionguard_tools src/electionguard_cli src/electionguard_gui stubs
 
 validate: 
 	@echo ✅ VALIDATE
@@ -182,9 +183,12 @@ ifeq ($(OS), Windows)
 	choco install wget
 	choco install unzip
 endif
-	wget https://github.com/microsoft/electionguard/releases/download/v0.95.0/sample-data.zip
+	wget -O sample-data.zip https://github.com/microsoft/electionguard/releases/download/v1.0/sample-data.zip
 	unzip -o sample-data.zip
-	unzip sample-data.zip
+
+generate-sample-data:
+	@echo 🔁 GENERATE Sample Data
+	poetry run python3 src/electionguard_tools/scripts/sample_generator.py -m "hamilton-general" -n $(SAMPLE_BALLOT_COUNT) -s $(SAMPLE_BALLOT_SPOIL_RATE)
 
 # Publish
 publish:
@@ -201,16 +205,6 @@ publish-test-ci:
 	@echo 🚀 PUBLISH TEST
 	poetry publish --repository testpypi --username __token__ --password $(TEST_PYPI_TOKEN)
 
-publish-validate:
-	@echo ✅ VALIDATE
-	python3 -m pip install --no-deps electionguard
-	python3 -c 'import electionguard'
-
-publish-validate-test:
-	@echo ✅ VALIDATE
-	python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps electionguard
-	python3 -c 'import electionguard'
-
 # Release
 release-zip-ci:
 	@echo 📁 ZIP RELEASE ARTIFACTS
@@ -220,19 +214,49 @@ release-zip-ci:
 
 release-notes:
 	@echo 📝 GENERATE RELEASE NOTES
-	export MILESTONE_NUM=$(cat $GITHUB_EVENT_PATH | jq '.milestone.number')
-	export MILESTONE_URL=$(cat $GITHUB_EVENT_PATH | jq '.milestone.url')
-	export MILESTONE_TITLE=$(cat $GITHUB_EVENT_PATH | jq '.milestone.title')
-	export MILESTONE_DESCRIPTION=$(cat $GITHUB_EVENT_PATH | jq '.milestone.description')
+	export MILESTONE_NUM=$(cat ${GITHUB_EVENT_PATH} | jq '.milestone.number')
+	export MILESTONE_URL=$(cat ${GITHUB_EVENT_PATH} | jq '.milestone.url')
+	export MILESTONE_TITLE=$(cat ${GITHUB_EVENT_PATH} | jq '.milestone.title')
+	export MILESTONE_DESCRIPTION=$(cat ${GITHUB_EVENT_PATH} | jq '.milestone.description')
 	touch release_notes.md
-	echo "# $MILESTONE_TITLE" >> release_notes.md
-	echo "$MILESTONE_DESCRIPTION" >> release_notes.md
+	echo "# ${MILESTONE_TITLE}" >> release_notes.md
+	echo "${MILESTONE_DESCRIPTION}" >> release_notes.md
 	echo -en "\n" >> release_notes.md
 	echo "## Issues" >> release_notes.md
-	curl "${GITHUB_API_URL}/${GITHUB_REPOSITORY}/issues?milestone=${MILESTONE_NUM}&state=all" | jq '.[].title' | while read i; do echo "[$i]($MILESTONE_URL)" >> release_notes.md; done
+	curl "${GITHUB_API_URL}/${GITHUB_REPOSITORY}/issues?milestone=${MILESTONE_NUM}&state=all" | jq '.[].title' | while read i; do echo "[$i](${MILESTONE_URL})" >> release_notes.md; done
+
+egui:
+ifeq "${EG_DB_PASSWORD}" ""
+	@echo "Set the EG_DB_PASSWORD environment variable"
+	exit 1
+endif
+	poetry run egui
+
+start-db:
+ifeq "${EG_DB_PASSWORD}" ""
+	@echo "Set the EG_DB_PASSWORD environment variable"
+	exit 1
+endif
+	docker compose --env-file ./.env -f src/electionguard_db/docker-compose.db.yml up -d
+
+stop-db:
+	docker compose --env-file ./.env -f src/electionguard_db/docker-compose.db.yml down
+
+build-egui:
+	docker build -t egui -f ./src/electionguard_gui/Dockerfile .
+
+start-egui: build-egui
+ifeq "${EG_DB_PASSWORD}" ""
+	@echo "Set the EG_DB_PASSWORD environment variable"
+	exit 1
+endif
+	docker compose --env-file ./.env -f src/electionguard_gui/docker-compose.yml up -d
+
+stop-egui:
+	docker compose --env-file ./.env -f src/electionguard_gui/docker-compose.yml down
 
 eg-e2e-simple-election:
 	poetry run eg e2e --guardian-count=2 --quorum=2 --manifest=data/election_manifest_simple.json --ballots=data/plaintext_ballots_simple.json --spoil-id=25a7111b-4334-425a-87c1-f7a49f42b3a2 --output-record="./election_record.zip"
 
 eg-setup-simple-election:
-	poetry run eg setup --guardian-count=2 --quorum=2 --manifest=data/election_manifest_simple.json  --out=../data/out
+	poetry run eg setup --guardian-count=2 --quorum=2 --manifest=data/election_manifest_simple.json  --package-dir=../data/out/public_encryption_package --keys-dir=../data/out/test_data_private_guardian_data

@@ -3,7 +3,7 @@
 from datetime import datetime
 import os
 from dataclasses import dataclass
-from typing import TypeVar, Callable, Optional, Tuple, List
+from typing import Any, TypeVar, Callable, Optional, Tuple, List
 
 from hypothesis.strategies import (
     composite,
@@ -17,7 +17,6 @@ from hypothesis.strategies import (
 from electionguard.ballot import PlaintextBallot
 from electionguard.constants import ElectionConstants, get_constants
 from electionguard.election import CiphertextElectionContext
-from electionguard.election_builder import ElectionBuilder
 from electionguard.elgamal import ElGamalPublicKey
 from electionguard.encrypt import EncryptionDevice, contest_from, generate_device_uuid
 from electionguard.group import TWO_MOD_Q
@@ -29,6 +28,7 @@ from electionguard.manifest import (
     Manifest,
     ElectionType,
     InternalManifest,
+    SpecVersion,
     generate_placeholder_selections_from,
     GeopoliticalUnit,
     Candidate,
@@ -47,6 +47,7 @@ from electionguard.utils import get_optional
 from electionguard_tools.helpers.key_ceremony_orchestrator import (
     KeyCeremonyOrchestrator,
 )
+from electionguard_tools.helpers.election_builder import ElectionBuilder
 
 
 _T = TypeVar("_T")
@@ -85,6 +86,10 @@ class ElectionFactory:
         """Get simple manifest from json file."""
         return self._get_manifest_from_file(self.simple_election_manifest_file_name)
 
+    def get_manifest_from_filename(self, filename: str) -> Manifest:
+        """Get simple manifest from json file."""
+        return self._get_manifest_from_file(filename)
+
     @staticmethod
     def get_manifest_from_file(spec_version: str, sample_manifest: str) -> Manifest:
         """Get simple manifest from json file."""
@@ -105,20 +110,18 @@ class ElectionFactory:
         """Get Hamilton County manifest from json file."""
         return from_file(
             Manifest,
-            os.path.join(
-                _data, os.path.join(_data, "hamilton-county", "election_manifest.json")
-            ),
+            os.path.join(_data, os.path.join(_data, "manifest-hamilton-general.json")),
         )
 
     def get_sample_manifest_with_encryption_context(
-        self, spec_version: str, sample_manifest: str
+        self, sample_manifest: str
     ) -> Tuple[AllPublicElectionData, AllPrivateElectionData]:
         """Get hamilton manifest and context"""
         guardians: List[Guardian] = []
         guardian_records: List[GuardianRecord] = []
 
         # Configure the election builder
-        manifest = self.get_manifest_from_file(spec_version, sample_manifest)
+        manifest = self.get_manifest_from_filename(f"manifest-{sample_manifest}.json")
         builder = ElectionBuilder(NUMBER_OF_GUARDIANS, QUORUM, manifest)
 
         # Run the Key Ceremony
@@ -204,7 +207,7 @@ class ElectionFactory:
         )
 
         fake_manifest = Manifest(
-            spec_version="v0.95",
+            spec_version=SpecVersion.EG0_95,
             election_scope_id="some-scope-id",
             type=ElectionType.unknown,
             start_date=datetime.now(),
@@ -276,11 +279,11 @@ class ElectionFactory:
 @composite
 def get_selection_description_well_formed(
     draw: _DrawType,
-    ints=integers(1, 20),
-    email_addresses=emails(),
+    ints: Any = integers(1, 20),
+    email_addresses: Any = emails(),
     candidate_id: Optional[str] = None,
     sequence_order: Optional[int] = None,
-    ids=uuids(),
+    ids: Any = uuids(),
 ) -> Tuple[str, SelectionDescription]:
     """Get mock well formed selection description."""
     if candidate_id is None:
@@ -297,10 +300,10 @@ def get_selection_description_well_formed(
 @composite
 def get_contest_description_well_formed(
     draw: _DrawType,
-    ints=integers(1, 20),
-    txt=text(),
-    email_addresses=emails(),
-    selections=get_selection_description_well_formed(),
+    ints: Any = integers(1, 20),
+    txt: Any = text(),
+    email_addresses: Any = emails(),
+    selections: Any = get_selection_description_well_formed(),
     sequence_order: Optional[int] = None,
     electoral_district_id: Optional[str] = None,
 ) -> Tuple[str, ContestDescription]:

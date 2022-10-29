@@ -1,12 +1,12 @@
-from typing import Optional, List, Type, TypeVar
+from typing import List, Type, TypeVar
 from os.path import isfile, isdir, join
 from os import listdir
 from io import TextIOWrapper
 from click import echo
 
 from electionguard.election import CiphertextElectionContext
-from electionguard.manifest import InternationalizedText, Manifest
-from electionguard.serialize import from_list_in_file, from_file
+from electionguard.manifest import Manifest
+from electionguard.serialize import from_list_in_file, from_file, from_raw
 from electionguard.serialize import (
     from_file_wrapper,
 )
@@ -26,12 +26,15 @@ class InputRetrievalStepBase(CliStepBase):
         self.__print_manifest(manifest)
         return manifest
 
-    def __print_manifest(self, manifest: Manifest) -> None:
-        def get_first_value(text: Optional[InternationalizedText]) -> str:
-            return "" if text is None else text.text[0].value
+    def _get_manifest_raw(self, manifest_raw: str) -> Manifest:
+        manifest: Manifest = from_raw(Manifest, manifest_raw)
+        if not manifest.is_valid():
+            raise ValueError("manifest file is invalid")
+        self.__print_manifest(manifest)
+        return manifest
 
-        manifest_name = get_first_value(manifest.name)
-        self.print_value("Name", manifest_name)
+    def __print_manifest(self, manifest: Manifest) -> None:
+        self.print_value("Name", manifest.get_name())
         self.print_value("Scope", manifest.election_scope_id)
         self.print_value("Geopolitical Units", len(manifest.geopolitical_units))
         self.print_value("Parties", len(manifest.parties))

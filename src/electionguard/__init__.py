@@ -7,6 +7,7 @@ from electionguard import ballot_code
 from electionguard import ballot_compact
 from electionguard import ballot_validator
 from electionguard import big_integer
+from electionguard import byte_padding
 from electionguard import chaum_pedersen
 from electionguard import constants
 from electionguard import data_store
@@ -17,7 +18,6 @@ from electionguard import decryption_mediator
 from electionguard import decryption_share
 from electionguard import discrete_log
 from electionguard import election
-from electionguard import election_builder
 from electionguard import election_object_base
 from electionguard import election_polynomial
 from electionguard import elgamal
@@ -88,6 +88,13 @@ from electionguard.ballot_validator import (
 from electionguard.big_integer import (
     BigInteger,
     bytes_to_hex,
+)
+from electionguard.byte_padding import (
+    DataSize,
+    TruncationError,
+    add_padding,
+    remove_padding,
+    to_padded_bytes,
 )
 from electionguard.chaum_pedersen import (
     ChaumPedersenProof,
@@ -180,9 +187,6 @@ from electionguard.election import (
     CiphertextElectionContext,
     Configuration,
     make_ciphertext_election_context,
-)
-from electionguard.election_builder import (
-    ElectionBuilder,
 )
 from electionguard.election_object_base import (
     ElectionObjectBase,
@@ -324,12 +328,14 @@ from electionguard.manifest import (
     Party,
     ReferendumContestDescription,
     ReportingUnitType,
+    SUPPORTED_VOTE_VARIATIONS,
     SelectionDescription,
     SpecVersion,
     VoteVariationType,
     contest_description_with_placeholders_from,
     generate_placeholder_selection_from,
     generate_placeholder_selections_from,
+    get_i8n_value,
 )
 from electionguard.nonces import (
     Nonces,
@@ -346,14 +352,12 @@ from electionguard.schnorr import (
     make_schnorr_proof,
 )
 from electionguard.serialize import (
-    PAD_INDICATOR_SIZE,
-    PaddedDataSize,
-    TruncationError,
     construct_path,
     from_file,
     from_file_wrapper,
     from_list_in_file,
     from_list_in_file_wrapper,
+    from_list_raw,
     from_raw,
     get_schema,
     padded_decode,
@@ -448,6 +452,7 @@ __all__ = [
     "CryptoHashable",
     "CryptoHashableAll",
     "CryptoHashableT",
+    "DataSize",
     "DataStore",
     "DecryptionMediator",
     "DecryptionShare",
@@ -461,7 +466,6 @@ __all__ = [
     "ElGamalKeyPair",
     "ElGamalPublicKey",
     "ElGamalSecretKey",
-    "ElectionBuilder",
     "ElectionConstants",
     "ElectionGuardLog",
     "ElectionJointKey",
@@ -503,8 +507,6 @@ __all__ = [
     "NullVoteException",
     "OrderedObjectBase",
     "OverVoteException",
-    "PAD_INDICATOR_SIZE",
-    "PaddedDataSize",
     "Party",
     "PlaintextBallot",
     "PlaintextBallotContest",
@@ -525,6 +527,7 @@ __all__ = [
     "ReportingUnitType",
     "SMALL_TEST_CONSTANTS",
     "STANDARD_CONSTANTS",
+    "SUPPORTED_VOTE_VARIATIONS",
     "Scheduler",
     "SchnorrProof",
     "SecretCoefficient",
@@ -540,6 +543,7 @@ __all__ = [
     "YES_VOTE",
     "a_minus_b_q",
     "a_plus_bc_q",
+    "add_padding",
     "add_q",
     "ballot",
     "ballot_box",
@@ -549,6 +553,7 @@ __all__ = [
     "ballot_is_valid_for_style",
     "ballot_validator",
     "big_integer",
+    "byte_padding",
     "bytes_to_hex",
     "cast_ballot",
     "chaum_pedersen",
@@ -601,7 +606,6 @@ __all__ = [
     "div_p",
     "div_q",
     "election",
-    "election_builder",
     "election_object_base",
     "election_polynomial",
     "elgamal",
@@ -622,6 +626,7 @@ __all__ = [
     "from_file_wrapper",
     "from_list_in_file",
     "from_list_in_file_wrapper",
+    "from_list_raw",
     "from_raw",
     "g_pow_p",
     "generate_device_uuid",
@@ -640,6 +645,7 @@ __all__ = [
     "get_generator",
     "get_hash_for_device",
     "get_hmac",
+    "get_i8n_value",
     "get_large_prime",
     "get_optional",
     "get_or_else_optional",
@@ -702,6 +708,7 @@ __all__ = [
     "reconstruct_decryption_contest",
     "reconstruct_decryption_share",
     "reconstruct_decryption_share_for_ballot",
+    "remove_padding",
     "scheduler",
     "schnorr",
     "selection_from",
@@ -719,6 +726,7 @@ __all__ = [
     "to_file",
     "to_hex_bytes",
     "to_iso_date_string",
+    "to_padded_bytes",
     "to_raw",
     "to_ticks",
     "type",
